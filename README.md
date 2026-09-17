@@ -133,6 +133,10 @@ para identificar el negocio.
 
 ## 4. Coste: cómo mantenerlo en 0 €
 
+Resumen: **prueba con la vía B** (Maps Demo Key, sin tarjeta) y, si adoptas la
+herramienta para el trabajo diario, **pásate a la vía A** (clave estándar con
+tope de cuota). Ambas cuestan 0 €; la diferencia está en las garantías.
+
 ### Qué se factura exactamente
 
 La aplicación **no instancia ningún mapa**: sólo carga la librería `places` y
@@ -185,13 +189,28 @@ método de pago.
   exactamente lo que usa esta aplicación: **funciona sin tocar el código**.
 - Tiene un **límite diario por API** (del orden de 100 llamadas al día). Al
   alcanzarlo el uso se pausa hasta el día siguiente **sin riesgo de cargo**.
-- Google la describe como clave **para prototipado y pruebas, no para
-  producción**. Para una herramienta interna de un solo usuario es viable, pero
-  conviene saberlo: los límites pueden cambiar y no hay compromiso de servicio.
 - No expone contenido generado por usuarios (fotos y reseñas), algo que esta
   aplicación no necesita.
 - Si más adelante quieres pasar a la vía A, basta con **añadir facturación a esa
-  misma clave**; no hay que rehacer nada.
+  misma clave** desde Cloud Console; no hay que tocar código ni reconfigurar la
+  aplicación.
+
+**Lo que hay que saber antes de depender de ella.** No caduca por fecha, pero
+sus [términos de servicio](https://cloud.google.com/terms/maps-platform/demo-project-terms)
+son explícitos:
+
+- «El uso en producción está estrictamente prohibido»: es una clave para
+  evaluar y probar.
+- Google puede «aplicar, ajustar o poner a cero estos límites de uso en
+  cualquier momento sin avisar».
+- Google se reserva el derecho de «suspender o cancelar el acceso en cualquier
+  momento, por cualquier motivo, sin aviso previo ni responsabilidad».
+- No hay SLA ni soporte: ninguna garantía de disponibilidad.
+
+Es decir: el riesgo no es que expire, es que **deje de funcionar sin aviso en el
+momento menos oportuno**, delante de un cliente. Sirve perfectamente para la
+prueba inicial; para el uso diario conviene la vía A, que cuesta lo mismo (0 €)
+y añade restricción por dominio y límites estables.
 
 > Con el `freeTier` de [`js/config.js`](js/config.js) ajustas el umbral del aviso
 > del contador: `{ perDay: 100, perMonth: 5000 }` viene pensado para la Demo Key;
