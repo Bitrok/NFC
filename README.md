@@ -34,6 +34,8 @@ Buscar «Bar Catalunya» → elegir el establecimiento → Place ID
   la API.
 - **Detección opcional de ubicación** del dispositivo para priorizar por
   proximidad cuando estás delante del establecimiento.
+- **Caché de búsquedas y contador de uso**, para que la herramienta se mantenga
+  dentro del nivel gratuito de Google (ver el apartado 4).
 - **Estados explícitos** de carga, sin resultados, error de API, API key
   rechazada y problema de conexión, con reintento.
 
@@ -57,6 +59,8 @@ forma diferida y sólo cuando se despliega el código QR.
 │   ├── places.js         Carga de Maps JS API, búsqueda y normalización
 │   ├── review.js         Validación del Place ID y construcción del enlace
 │   ├── history.js        Historial local
+│   ├── cache.js          Caché de búsquedas (evita llamadas repetidas)
+│   ├── usage.js          Contador local de llamadas consumidas
 │   └── qr.js             Generación diferida del código QR
 ├── vendor/
 │   └── qrcode.js         Generador de QR (MIT, Kazuhiko Arase)
@@ -121,28 +125,97 @@ Motivos de esta elección:
   apareciendo si son la mejor coincidencia.
 
 El sesgo geográfico, el idioma, el radio y el número de resultados se ajustan en
-[`js/config.js`](js/config.js).
+[`js/config.js`](js/config.js). El apartado 4 detalla por qué esta combinación de
+campos es también la más barata posible sin perder la información que hace falta
+para identificar el negocio.
 
 ---
 
-## 4. APIs que hay que activar
+## 4. Coste: cómo mantenerlo en 0 €
 
-En [Google Cloud Console](https://console.cloud.google.com/) → **APIs y
-servicios** → **Biblioteca**, con un proyecto que tenga **facturación
-habilitada** (Places API (New) la exige, aunque el uso de esta herramienta cabe
-sobradamente en el crédito mensual gratuito de Google Maps Platform):
+### Qué se factura exactamente
+
+La aplicación **no instancia ningún mapa**: sólo carga la librería `places` y
+llama a `Place.searchByText`. El SKU «Dynamic Maps» de Maps JavaScript API se
+factura por *carga de mapa*, así que aquí no se activa. El único evento
+facturable es **una llamada de Text Search por búsqueda**.
+
+Los campos que pide la aplicación (`displayName`, `formattedAddress`,
+`addressComponents`, `location`, `businessStatus`, `primaryTypeDisplayName`)
+sitúan la petición en el SKU **Text Search Pro**, que incluye **5.000 llamadas
+gratuitas al mes**. No se puede bajar de ese SKU: el nivel inferior
+(«Essentials IDs Only») sólo devuelve identificadores, sin nombre ni dirección,
+con lo que sería imposible distinguir el negocio correcto.
+
+Un uso realista de visitas comerciales (50 búsquedas al día) son unas 1.500
+llamadas al mes: **menos de un tercio del margen gratuito**.
+
+Además, la aplicación reduce el consumo por su cuenta:
+
+- **Caché de búsquedas** (12 h): repetir la misma consulta, volver atrás o
+  reintentar tras un error no gasta ninguna llamada.
+- **Historial local**: reabrir un negocio ya consultado no llama a la API.
+- **Contador visible** en la pantalla de búsqueda con las llamadas de hoy y del
+  mes, que se pone en rojo al llegar al 80 % del límite configurado en
+  [`js/config.js`](js/config.js).
+
+### Vía A — Clave estándar (0 € garantizado, pero con tarjeta)
+
+Google exige una cuenta de facturación con método de pago para emitir una clave
+estándar, **aunque no llegues a pagar nunca**. Para que no haya ninguna
+sorpresa, pon topes duros:
+
+1. *APIs y servicios* → **Places API (New)** → **Cuotas**: límite de, por
+   ejemplo, **150 peticiones al día** (unas 4.500 al mes, por debajo de las
+   5.000 gratuitas). Al alcanzarlo, Google devuelve error en lugar de cobrar.
+2. *Facturación* → **Presupuestos y alertas**: presupuesto de 1 € con avisos por
+   correo. Sirve de red de seguridad, no de límite.
+
+Con el tope diario por debajo del margen gratuito, es **matemáticamente
+imposible** generar factura.
+
+### Vía B — Maps Demo Key (sin tarjeta)
+
+Si no quieres dar ninguna tarjeta, Google ofrece la **Maps Demo Key**: se
+obtiene con sólo una cuenta de Google en
+<https://developers.google.com/maps/demo-key>, sin cuenta de facturación y sin
+método de pago.
+
+- Soporta **Maps JavaScript API** y **Text Search** de Places, que es
+  exactamente lo que usa esta aplicación: **funciona sin tocar el código**.
+- Tiene un **límite diario por API** (del orden de 100 llamadas al día). Al
+  alcanzarlo el uso se pausa hasta el día siguiente **sin riesgo de cargo**.
+- Google la describe como clave **para prototipado y pruebas, no para
+  producción**. Para una herramienta interna de un solo usuario es viable, pero
+  conviene saberlo: los límites pueden cambiar y no hay compromiso de servicio.
+- No expone contenido generado por usuarios (fotos y reseñas), algo que esta
+  aplicación no necesita.
+- Si más adelante quieres pasar a la vía A, basta con **añadir facturación a esa
+  misma clave**; no hay que rehacer nada.
+
+> Con el `freeTier` de [`js/config.js`](js/config.js) ajustas el umbral del aviso
+> del contador: `{ perDay: 100, perMonth: 5000 }` viene pensado para la Demo Key;
+> con clave estándar puedes subir `perDay`.
+
+### APIs que hay que habilitar (vía A)
+
+En [Google Cloud Console](https://console.cloud.google.com/) → *APIs y
+servicios* → *Biblioteca*:
 
 | API | Para qué |
 |-----|----------|
 | **Maps JavaScript API** | Cargar el runtime y la librería `places` en el navegador |
 | **Places API (New)** | Ejecutar Text Search (New) |
 
-> No hace falta activar la Places API heredada. Si el proyecto es nuevo, Google
-> sólo ofrecerá la versión «(New)».
+No hace falta activar la Places API heredada. Con la Demo Key no tienes que
+habilitar nada: ya viene con esos productos activos.
 
 ---
 
 ## 5. Cómo crear la API key
+
+> Sólo para la **vía A**. Con la Maps Demo Key la clave te la da directamente
+> <https://developers.google.com/maps/demo-key> y puedes saltar al apartado 7.
 
 1. **APIs y servicios** → **Credenciales**.
 2. **Crear credenciales** → **Clave de API**.
@@ -160,6 +233,10 @@ Esta es la parte importante: la aplicación es un frontend estático y público,
 que la clave **es visible para cualquiera que la use**. La protección no consiste
 en esconderla, sino en que **no sirva para nada fuera de este sitio** y en que
 **no pueda generar un gasto significativo**.
+
+> La Maps Demo Key no se administra como una clave propia, así que no admite
+> estas restricciones; su protección es el tope diario impuesto por Google. Si
+> usas la Demo Key, salta al apartado 7.
 
 ### 6.1 Restricción de aplicación: referentes HTTP
 
@@ -193,16 +270,12 @@ selecciona **sólo**:
 Con esto, aunque alguien extraiga la clave no podrá usarla para Geocoding,
 Directions, Routes ni ninguna otra API de pago del proyecto.
 
-### 6.3 Límites de gasto (no lo omitas)
+### 6.3 Límites de gasto
 
 Las restricciones anteriores se pueden eludir falsificando la cabecera `Referer`
-desde fuera de un navegador. El control que realmente acota el daño es la cuota:
-
-1. **APIs y servicios** → **Places API (New)** → **Cuotas**: fija un límite
-   diario de peticiones acorde a tu uso (por ejemplo 200/día).
-2. Haz lo mismo con **Maps JavaScript API**.
-3. **Facturación** → **Presupuestos y alertas**: crea un presupuesto con avisos
-   por correo.
+desde fuera de un navegador. El control que realmente acota el daño es la cuota
+diaria, y es el mismo mecanismo que garantiza el coste cero: está explicado en
+el **apartado 4**. Con la Maps Demo Key el tope ya viene impuesto por Google.
 
 ### 6.4 Por qué no hay backend
 
@@ -300,6 +373,7 @@ Antes de grabar una placa NFC:
 |---------|----------------|
 | **«API key rechazada»** | La clave es incorrecta, le falta alguna de las dos APIs, o el origen actual no está en los referentes autorizados. El detalle del error indica el origen desde el que se ha llamado. |
 | **«Google Places ha devuelto un error»** | Places API (New) no está habilitada, la facturación no está activa o se ha agotado la cuota diaria. |
+| **Error de API a mitad del día** | Con la Maps Demo Key, tope diario agotado: se reanuda al día siguiente sin cargo. Con clave estándar, revisa la cuota del apartado 4. |
 | **«Problema de conexión»** | Sin red, o un bloqueador de contenido impide cargar `maps.googleapis.com`. |
 | **Sin resultados** | Prueba con el nombre completo y la localidad: «Bar Catalunya Terrassa». |
 | **No copia al portapapeles** | El portapapeles requiere HTTPS (o `localhost`). En `http://` con IP, mantén pulsado el enlace y cópialo a mano. |

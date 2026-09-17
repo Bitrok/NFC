@@ -38,6 +38,15 @@ export const CONFIG = {
   /** Entradas conservadas en el historial local. */
   historyLimit: 12,
 
+  /** Caché de búsquedas: evita gastar llamadas repitiendo la misma consulta. */
+  cacheTtlHours: 12,
+  cacheLimit: 30,
+
+  /** Límites del nivel gratuito, sólo para el aviso del contador de uso.
+   *  Clave estándar: 5.000 llamadas/mes del SKU «Text Search Pro».
+   *  Maps Demo Key: en torno a 100 llamadas/día y sin tarjeta. */
+  freeTier: { perDay: 100, perMonth: 5000 },
+
   /** Versión del runtime de Maps JavaScript API. */
   mapsVersion: 'weekly',
 };
@@ -49,4 +58,6 @@ export const REVIEW_URL_BASE = 'https://search.google.com/local/writereview';
 export const STORAGE_KEYS = {
   apiKey: 'nfc.reviewlinks.apikey',
   history: 'nfc.reviewlinks.history',
+  cache: 'nfc.reviewlinks.cache',
+  usage: 'nfc.reviewlinks.usage',
 };

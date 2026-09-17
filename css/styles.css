@@ -232,6 +232,12 @@ a { color: var(--primary); }
 .chip__ico { width: 17px; height: 17px; }
 .biasrow__label { font-size: 0.8125rem; color: var(--text-dim); }
 
+.usage {
+  margin: -10px 0 20px;
+  font-size: 0.8125rem; color: var(--text-dim);
+}
+.usage--warn { color: var(--danger); font-weight: 600; }
+
 /* ---------------------------------------------------------------- cards --- */
 .cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 

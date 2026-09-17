@@ -11,6 +11,8 @@ import {
   searchBusinesses,
 } from './places.js';
 import { addToHistory, clearHistory, getHistory } from './history.js';
+import { cacheKey, clearCache, getCached, setCached } from './cache.js';
+import { getUsage, recordApiCall } from './usage.js';
 import { forgetApiKey, getApiKey, isApiKeyFixed, looksLikeApiKey, saveApiKey } from './apikey.js';
 import { renderQr } from './qr.js';
 
@@ -36,6 +38,7 @@ const el = {
   history: $('history'),
   historyList: $('history-list'),
   btnClearHistory: $('btn-clear-history'),
+  usage: $('usage'),
   // results
   resultsTitle: $('results-h'),
   resultsMeta: $('results-meta'),
@@ -202,6 +205,7 @@ el.btnSettings.addEventListener('click', () => openSetup());
 
 function goToSearch() {
   renderHistory();
+  renderUsage();
   showView('search');
 }
 
@@ -225,17 +229,40 @@ async function runSearch(query) {
   }
 
   state.query = query;
-  showLoading('Buscando establecimientos…');
+  const bias = activeBias();
+  const key = cacheKey(query, bias);
 
+  const cached = getCached(key);
+  if (cached) {
+    state.results = prioritizeResults(cached, bias);
+    renderResults({ fromCache: true });
+    showView('results');
+    return;
+  }
+
+  showLoading('Buscando establecimientos…');
   try {
-    const bias = activeBias();
     const found = await searchBusinesses(apiKey, query, bias);
+    recordApiCall();
+    setCached(key, found);
     state.results = prioritizeResults(found, bias);
     renderResults();
     showView('results');
   } catch (error) {
     showError(error, () => runSearch(query));
   }
+}
+
+/** Resumen de llamadas consumidas, para no salirse del nivel gratuito. */
+function renderUsage() {
+  const { dayCount, monthCount } = getUsage();
+  const { perDay, perMonth } = CONFIG.freeTier;
+  el.usage.textContent =
+    `${dayCount} ${dayCount === 1 ? 'búsqueda' : 'búsquedas'} hoy · ${monthCount} este mes`;
+  el.usage.classList.toggle(
+    'usage--warn',
+    dayCount >= perDay * 0.8 || monthCount >= perMonth * 0.8
+  );
 }
 
 /* -------------------------------------------------------------- ubicación --- */
@@ -323,7 +350,7 @@ function buildCard(place, options = {}) {
   return item;
 }
 
-function renderResults() {
+function renderResults(options = {}) {
   const count = state.results.length;
   el.resultsList.replaceChildren();
 
@@ -336,7 +363,9 @@ function renderResults() {
   }
 
   el.resultsTitle.textContent = count === 1 ? '1 resultado' : `${count} resultados`;
-  el.resultsMeta.textContent = `«${state.query}» · toca el negocio correcto`;
+  el.resultsMeta.textContent = options.fromCache
+    ? `«${state.query}» · resultados en caché, sin consumir API`
+    : `«${state.query}» · toca el negocio correcto`;
 
   const bias = activeBias();
   const fragment = document.createDocumentFragment();
@@ -524,6 +553,7 @@ el.btnErrorRetry.addEventListener('click', () => {
 
 el.btnClearHistory.addEventListener('click', () => {
   clearHistory();
+  clearCache();
   renderHistory();
   toast('Historial borrado');
 });
