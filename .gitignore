@@ -1,0 +1,12 @@
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# No debería haber dependencias, pero por si alguien prueba algo en local
+node_modules/
+package-lock.json

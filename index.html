@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Herramienta interna para generar enlaces directos de reseña de Google a partir del Place ID de un negocio.">
+<title>Enlaces de reseña · NFC</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232563eb'/%3E%3Cpath d='M16 6l2.9 6.1 6.6.9-4.8 4.6 1.2 6.6L16 21l-5.9 3.2 1.2-6.6L6.5 13l6.6-.9z' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body data-view="search">
+
+<header class="topbar">
+  <h1 class="topbar__title">Enlaces de reseña</h1>
+  <button type="button" id="btn-settings" class="iconbtn" aria-label="Ajustes de la API key">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h10M18 17h2"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="16" cy="17" r="2"/></svg>
+  </button>
+</header>
+
+<main class="app">
+
+  <!-- ============ SETUP / API KEY ============ -->
+  <section id="view-setup" class="view" aria-labelledby="setup-h">
+    <h2 id="setup-h" class="view__title">Configurar API key</h2>
+    <p class="muted">
+      La clave se guarda únicamente en este navegador (<code>localStorage</code>) y
+      nunca se envía a ningún servidor que no sea Google.
+    </p>
+    <p id="setup-fixed-note" class="note" hidden>
+      La clave está definida en <code>js/config.js</code>, así que no se puede cambiar
+      desde aquí. Edita ese archivo para modificarla.
+    </p>
+    <form id="form-key" class="stack" autocomplete="off">
+      <label class="label" for="input-key">Google Maps Platform API key</label>
+      <input id="input-key" class="input" type="password" inputmode="text"
+             placeholder="AIza..." autocomplete="off" autocapitalize="off"
+             autocorrect="off" spellcheck="false" required>
+      <label class="checkline">
+        <input type="checkbox" id="chk-show-key"> Mostrar clave
+      </label>
+      <button type="submit" class="btn btn--primary">Guardar y continuar</button>
+      <button type="button" id="btn-forget-key" class="btn btn--ghost" hidden>Borrar clave de este dispositivo</button>
+    </form>
+    <p class="muted small">
+      Necesita <strong>Maps JavaScript API</strong> y <strong>Places API (New)</strong> habilitadas,
+      y la clave restringida por referente HTTP. Instrucciones en el
+      <a href="https://github.com/Bitrok/NFC#6-c%C3%B3mo-restringir-la-api-key" target="_blank" rel="noopener noreferrer">README</a>.
+    </p>
+    <button type="button" id="btn-setup-back" class="btn btn--ghost" hidden>Volver</button>
+  </section>
+
+  <!-- ============ SEARCH ============ -->
+  <section id="view-search" class="view" aria-labelledby="search-h">
+    <h2 id="search-h" class="sr-only">Buscar negocio</h2>
+    <form id="form-search" class="searchbar" role="search">
+      <input id="input-query" class="input input--search" type="search" name="q"
+             placeholder="Bar Catalunya" enterkeyhint="search"
+             autocapitalize="sentences" autocorrect="off" spellcheck="false"
+             aria-label="Nombre del negocio" required>
+      <button type="submit" class="btn btn--primary btn--block" id="btn-search">Buscar</button>
+    </form>
+
+    <div class="biasrow">
+      <button type="button" id="btn-geo" class="chip" aria-pressed="false">
+        <svg viewBox="0 0 24 24" class="chip__ico" aria-hidden="true"><path d="M12 2v3m0 14v3M2 12h3m14 0h3" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor"/></svg>
+        Usar mi ubicación
+      </button>
+      <span id="bias-label" class="biasrow__label">Priorizando Terrassa</span>
+    </div>
+
+    <div id="history" class="history" hidden>
+      <div class="history__head">
+        <h3 class="history__title">Consultados recientemente</h3>
+        <button type="button" id="btn-clear-history" class="linkbtn">Borrar</button>
+      </div>
+      <ul id="history-list" class="cards"></ul>
+    </div>
+  </section>
+
+  <!-- ============ RESULTS ============ -->
+  <section id="view-results" class="view" aria-labelledby="results-h">
+    <div class="view__head">
+      <button type="button" class="backbtn" data-action="to-search" aria-label="Volver a la búsqueda">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 id="results-h" class="view__title" aria-live="polite">Resultados</h2>
+    </div>
+    <p id="results-meta" class="muted small"></p>
+    <ul id="results-list" class="cards"></ul>
+  </section>
+
+  <!-- ============ DETAIL ============ -->
+  <section id="view-detail" class="view" aria-labelledby="detail-name">
+    <div class="view__head">
+      <button type="button" class="backbtn" data-action="back-to-results" aria-label="Volver a los resultados">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <h2 id="detail-name" class="view__title">&nbsp;</h2>
+    </div>
+
+    <p id="detail-address" class="detail__address"></p>
+    <p id="detail-badges" class="badges"></p>
+
+    <div class="field">
+      <span class="field__label">Place ID</span>
+      <code id="detail-placeid" class="field__value"></code>
+      <button type="button" class="btn btn--sm" data-copy="placeid">Copiar ID</button>
+    </div>
+
+    <div class="field">
+      <span class="field__label">Enlace de reseña</span>
+      <code id="detail-url" class="field__value field__value--wrap"></code>
+    </div>
+
+    <details id="qr-box" class="qr">
+      <summary class="qr__summary">Código QR del enlace</summary>
+      <div id="qr-target" class="qr__target"></div>
+    </details>
+
+    <div class="actions">
+      <button type="button" class="btn btn--primary btn--block" data-copy="url" id="btn-copy-url">Copiar enlace</button>
+      <a id="btn-open" class="btn btn--accent btn--block" href="#" target="_blank" rel="noopener noreferrer">Abrir enlace</a>
+      <button type="button" id="btn-share" class="btn btn--block" hidden>Compartir</button>
+      <button type="button" class="btn btn--ghost btn--block" data-action="new-search">Buscar otro negocio</button>
+    </div>
+  </section>
+
+  <!-- ============ TRANSIENT STATES ============ -->
+  <div id="loading" class="state" hidden>
+    <div class="spinner" aria-hidden="true"></div>
+    <p id="loading-text" class="state__text">Buscando…</p>
+  </div>
+
+  <div id="error" class="state state--error" hidden role="alert">
+    <h2 id="error-title" class="state__title">Error</h2>
+    <p id="error-text" class="state__text"></p>
+    <pre id="error-detail" class="state__detail" hidden></pre>
+    <div class="actions">
+      <button type="button" id="btn-error-retry" class="btn btn--primary btn--block">Reintentar</button>
+      <button type="button" class="btn btn--ghost btn--block" data-action="to-search">Volver a la búsqueda</button>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
